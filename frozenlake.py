@@ -18,6 +18,7 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_colwidth', None)
 
+# Tutorial : https://github.com/anyscale/academy/blob/3d93b5dd0070ad9361953a4d521dd712230041a0/ray-rllib/acm_recsys_tutorial_2022/01_intro_gym_and_rllib_optional.ipynb
 
 # List all available gym environments
 # all_env = list(gym.envs.registry.all())
