@@ -1,4 +1,10 @@
 # import libraries
+# ray
+import ray
+from ray.rllib.utils.pre_checks.env import check_env
+# important to see the config of result
+from ray.tune.logger import pretty_print
+from ray import tune, rllib, air
 import gym
 from ipywidgets import Output
 from IPython import display
@@ -12,10 +18,6 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_colwidth', None)
 
-# ray
-import ray
-from ray import tune, rllib, air
-from ray.tune.logger import pretty_print # important to see the config of result
 
 # List all available gym environments
 # all_env = list(gym.envs.registry.all())
@@ -35,6 +37,14 @@ env_name = "FrozenLake-v0"
 # deterministic= current state + selected action dtermines the next state of environment (Chess)
 # stochastic= probability of distribution over a set of possible actions （Random visitor to website)
 env = gym.make(env_name, is_slippery=False)
+
+# Check for environment errors before continuing
+try:
+    check_env(env)
+    print("All checks passed. No errors found.")
+except:
+    print("failed")
+    exit()
 
 # Testing
 """
@@ -59,7 +69,8 @@ with out:
     # Putting the Gym simple API methods together.
     # Here is a pattern for running a bunch of episodes.
     num_episodes = 5  # Number of episodes you want to run the agent
-    total_reward = 0.0  # Initialize reward to 0
+    num_timesteps = 0
+    episode_rewards = []  # store every episode reward
 
     # Loop through episodes
     for ep in range(num_episodes):
@@ -67,6 +78,7 @@ with out:
         # Reset the environment at the start of each episode
         obs = env.reset()
         done = False
+        episode_reward = 0.0
 
         # Loop through time steps per episode
         while True:
@@ -76,15 +88,18 @@ with out:
 
             # apply the action
             new_obs, reward, done, info = env.step(action)
-            total_reward += reward
+            episode_reward += reward
+
+            num_timesteps += 1
 
             # If the epsiode is up, then start another one
             if done:
+                episode_rewards.append(episode_reward)
                 break
 
             # Render the env (in place).
             time.sleep(0.3)
             out.clear_output(wait=True)
             print(f"episode: {ep}")
-            print(f"obs: {new_obs}, reward: {total_reward}, done: {done}")
+            print(f"obs: {new_obs}, reward: {episode_reward}, done: {done}")
             env.render()
