@@ -2,5 +2,6 @@
  
 Learning using Ray
 
-pip install pipreqs
+pip install pipreqs 
+
 Update requirements.txt using "pipreqs --force"
