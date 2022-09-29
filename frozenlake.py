@@ -11,6 +11,11 @@ from IPython import display
 import numpy as np
 import os
 import time
+import random
+import matplotlib.pyplot as plt
+plt.rcParams['figure.dpi'] = 300
+plt.rcParams.update({'font.size': 17})
+from tqdm.notebook import tqdm
 
 # Customize for pandas
 import pandas as pd
@@ -18,89 +23,146 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_colwidth', None)
 
-# Tutorial : https://github.com/anyscale/academy/blob/3d93b5dd0070ad9361953a4d521dd712230041a0/ray-rllib/acm_recsys_tutorial_2022/01_intro_gym_and_rllib_optional.ipynb
-
-# List all available gym environments
-# all_env = list(gym.envs.registry.all())
-# print(f'Num Gym Environments: {len(all_env)}')
-
-# You could loop through and list all environments if you wanted
-# envs_starting_with_f = [e for e in all_env if str(e).startswith("EnvSpec(Frozen")]
-# [EnvSpec(FrozenLake-v0), EnvSpec(FrozenLake8x8-v0)]
+# Tutorial : https://colab.research.google.com/github/huggingface/deep-rl-class/blob/main/unit2/unit2.ipynb#scrollTo=fAgB7s0HEFMm
 
 # action space is 4 possible actions (LEFT, DOWN, RIGHT, UP)
 # observation space is 4x4, runs from 0 to 15
-env_name = "FrozenLake-v0"
+env = gym.make("FrozenLake-v1", map_name="4x4", is_slippery=True)
+env.reset()
+print("_____OBSERVATION SPACE_____ \n")
+print("Observation Space", env.observation_space)
+print("Sample observation", env.observation_space.sample()) # Get a random observation
 
-# Creating gym object
-# is_slippery=True specifies the environment is stochastic
-# is_slippery=False is the same as "deterministic=True"
-# deterministic= current state + selected action dtermines the next state of environment (Chess)
-# stochastic= probability of distribution over a set of possible actions （Random visitor to website)
-env = gym.make(env_name, is_slippery=False)
+print("\n _____ACTION SPACE_____ \n")
+print("Action Space Shape", env.action_space.n)
+print("Action Space Sample", env.action_space.sample()) # Take a random action
 
-# Check for environment errors before continuing
-try:
-    check_env(env)
-    print("All checks passed. No errors found.")
-except:
-    print("failed")
-    exit()
+state_space = env.observation_space.n
+print("There are ", state_space, " possible states")
 
-# Testing
-"""
-# Always Reset env before render for the first time
-env.reset()  # set done flag = false
-env.render()
+action_space = env.action_space.n
+print("There are ", action_space, " possible actions")
 
-# Take an action
-new_obs, reward, done, _ = env.step(2)  # Right
-env.render()
+# Let's create our Qtable of size (state_space, action_space) and initialized each values at 0 using np.zeros
+def initialize_q_table(state_space, action_space):
+  Qtable = np.zeros((state_space, action_space))
+  return Qtable
 
-new_obs, reward, done, _ = env.step(1)  # Down
-env.render()
-"""
+# We re-initialize the Q-table
+Qtable_frozenlake = initialize_q_table(state_space, action_space)
 
-# They allow us to render the env frame-by-frame in-place
-# (w/o creating a huge output which we would then have to scroll through).
-out = Output()
-display.display(out)
-with out:
+def epsilon_greedy_policy(Qtable, state, epsilon):
+  # Randomly generate a number between 0 and 1
+  random_int = random.uniform(0,1)
+  # if random_int > greater than epsilon --> exploitation
+  if random_int > epsilon:
+    # Take the action with the highest value given a state
+    # np.argmax can be useful here
+    action = np.argmax(Qtable[state])
+  # else --> exploration
+  else:
+    action = env.action_space.sample()
+  
+  return action
 
-    # Putting the Gym simple API methods together.
-    # Here is a pattern for running a bunch of episodes.
-    num_episodes = 5  # Number of episodes you want to run the agent
-    num_timesteps = 0
-    episode_rewards = []  # store every episode reward
+def greedy_policy(Qtable, state):
+  # Exploitation: take the action with the highest state, action value
+  action = np.argmax(Qtable[state])
+  
+  return action
 
-    # Loop through episodes
-    for ep in range(num_episodes):
+# Training parameters
+n_training_episodes = 10000  # Total training episodes
+learning_rate = 0.7          # Learning rate
 
-        # Reset the environment at the start of each episode
-        obs = env.reset()
-        done = False
-        episode_reward = 0.0
+# Evaluation parameters
+n_eval_episodes = 100        # Total number of test episodes
 
-        # Loop through time steps per episode
-        while True:
+# Environment parameters
+env_id = "FrozenLake-v1"     # Name of the environment
+max_steps = 99               # Max steps per episode
+gamma = 0.95                 # Discounting rate
+eval_seed = []               # The evaluation seed of the environment
 
-            # take random action, but you can also do something more intelligent
-            action = env.action_space.sample()
+# Exploration parameters
+max_epsilon = 1.0             # Exploration probability at start
+min_epsilon = 0.05            # Minimum exploration probability
+decay_rate = 0.0005            # Exponential decay rate for exploration prob
 
-            # apply the action
-            new_obs, reward, done, info = env.step(action)
-            episode_reward += reward
+# List of outcomes to plot
+outcomes = []
 
-            num_timesteps += 1
+print('Qtable_frozenlake before training:')
+print(Qtable_frozenlake)
 
-            # If the epsiode is up, then start another one
-            if done:
-                episode_rewards.append(episode_reward)
-                break
+def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_steps, Qtable):
+  for episode in tqdm(range(n_training_episodes)):
+    # Reduce epsilon (because we need less and less exploration)
+    epsilon = min_epsilon + (max_epsilon - min_epsilon)*np.exp(-decay_rate*episode)
+    # Reset the environment
+    state = env.reset()
+    step = 0
+    done = False
 
-            # Render the env (in place).
-            time.sleep(0.3)
-            out.clear_output(wait=True)
-            print(f"episode: {ep}")
-            print(f"obs: {new_obs}, reward: {episode_reward}, done: {done}")
-            env.render()
+    # repeat
+    for step in range(max_steps):
+      # Choose the action At using epsilon greedy policy
+      action = epsilon_greedy_policy(Qtable, state, epsilon)
+
+      # Take action At and observe Rt+1 and St+1
+      # Take the action (a) and observe the outcome state(s') and reward (r)
+      new_state, reward, done, info = env.step(action)
+
+      # Update Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]
+      Qtable[state][action] = Qtable[state][action] + learning_rate * (reward + gamma * np.max(Qtable[new_state]) - Qtable[state][action])   
+
+      # If done, finish the episode
+      if done:
+        break
+      
+      # Our state is the new state
+      state = new_state
+  return Qtable
+
+
+Qtable_frozenlake = train(n_training_episodes, min_epsilon,
+                          max_epsilon, decay_rate, env, max_steps, Qtable_frozenlake)
+Qtable_frozenlake
+
+
+def evaluate_agent(env, max_steps, n_eval_episodes, Q, seed):
+  """
+  Evaluate the agent for ``n_eval_episodes`` episodes and returns average reward and std of reward.
+  :param env: The evaluation environment
+  :param n_eval_episodes: Number of episode to evaluate the agent
+  :param Q: The Q-table
+  :param seed: The evaluation seed array (for taxi-v3)
+  """
+  episode_rewards = []
+  for episode in tqdm(range(n_eval_episodes)):
+    if seed:
+      state = env.reset(seed=seed[episode])
+    else:
+      state = env.reset()
+    step = 0
+    done = False
+    total_rewards_ep = 0
+
+    for step in range(max_steps):
+      # Take the action (index) that have the maximum expected future reward given that state
+      action = np.argmax(Q[state][:])
+      new_state, reward, done, info = env.step(action)
+      total_rewards_ep += reward
+
+      if done:
+        break
+      state = new_state
+    episode_rewards.append(total_rewards_ep)
+  mean_reward = np.mean(episode_rewards)
+  std_reward = np.std(episode_rewards)
+
+  return mean_reward, std_reward
+
+# Evaluate our Agent
+mean_reward, std_reward = evaluate_agent(env, max_steps, n_eval_episodes, Qtable_frozenlake, eval_seed)
+print(f"Mean_reward={mean_reward:.2f} +/- {std_reward:.2f}")
