@@ -9,8 +9,6 @@ import gym
 from ipywidgets import Output
 from IPython import display
 import numpy as np
-import os
-import time
 import random
 import matplotlib.pyplot as plt
 plt.rcParams['figure.dpi'] = 300
@@ -42,6 +40,13 @@ def epsilon_greedy_policy(Qtable, state, epsilon, env):
   return action
 
 def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_steps, Qtable, learning_rate, gamma):
+  """
+  Reward function:
+
+  Reach goal: +1
+  Reach hole: 0
+  Reach frozen: 0
+  """
   for episode in range(n_training_episodes):
     # Reduce epsilon (because we need less and less exploration)
     epsilon = min_epsilon + (max_epsilon - min_epsilon)*np.exp(-decay_rate*episode)
@@ -59,8 +64,8 @@ def train(n_training_episodes, min_epsilon, max_epsilon, decay_rate, env, max_st
       # Take the action (a) and observe the outcome state(s') and reward (r)
       new_state, reward, done, info = env.step(action)
 
-      # Update Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]
-      Qtable[state][action] = Qtable[state][action] + learning_rate * (reward + gamma * np.max(Qtable[new_state]) - Qtable[state][action])   
+      # Update Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]S
+      Qtable[state][action] = round(Qtable[state][action] + learning_rate * (reward + gamma * np.max(Qtable[new_state]) - Qtable[state][action]), 3)   
 
       # If done, finish the episode
       if done:
@@ -105,7 +110,7 @@ def evaluate_agent(env, max_steps, n_eval_episodes, Q, seed):
 
 def main():
     # Training parameters
-    n_training_episodes = 10000  # Total training episodes
+    n_training_episodes = 45000  # STotal training episodes
     learning_rate = 0.7          # Learning rate
 
     # Evaluation parameters
