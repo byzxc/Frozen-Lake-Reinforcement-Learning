@@ -1,6 +1,8 @@
 # Frozen Lake V1 Reinforcement Learning
  
-Learning using Ray
+Learning Reinforcement Learning through OpenAI Frozen Lake Environment.
+
+Policy used: Epsilon Greedy Policy
 
 pip install pipreqs 
 
